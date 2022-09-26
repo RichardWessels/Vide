@@ -12,17 +12,23 @@ const BOUNDRY_RIGHT = 950 - Math.floor(50*Math.sqrt(DIFFICULTY))
 const LEFT_KEYS = ["ArrowLeft", "a"]
 const RIGHT_KEYS = ["ArrowRight", "d"]
 
+// Audio setup
+const audioContext = new AudioContext();
+const osc = audioContext.createOscillator();
+const gain = audioContext.createGain();
+
+let start = false
 let bias = BIAS_RANGE/2  // left bias is 0-BIAS_RANGE to 1, right (BIAS_RANGE/2)+1 to BIAS_RANGE, BIAS_RANGE/2 is neutral
 let last_bias_update = new Date().getTime()
-var pos = CENTER
+let pos = CENTER
 let oldPos
 let heldLenL = 0
 let heldLenR = 0
 let bias_update_period = 100*LOOP_PERIOD
 let goLeft = true  // tracks current movement direction
 
-var c = document.getElementById("myCanvas");
-var ctx = c.getContext("2d");
+let c = document.getElementById("myCanvas");
+let ctx = c.getContext("2d");
 ctx.fillStyle = "red"
 ctx.fillRect(0, 0, BOUNDRY_LEFT, 400)
 ctx.fillRect(BOUNDRY_RIGHT, 0, 500, 400)  // using 500 for when boundry moves
@@ -34,29 +40,12 @@ printDebug = function() {
         console.log.apply(console, Array.from(arguments))
 }
 
-document.addEventListener("keydown", async function(e) {
-    if (LEFT_KEYS.includes(e.key)) {
-        printDebug("pressing left")
-        heldLenR = 0
-        isKeyDownL = true
-        goLeft = true;
+async function startScreen() {
+    while (!start) {
+        await new Promise(r => setTimeout(r, 500));
     }
-    if (RIGHT_KEYS.includes(e.key)) {
-        printDebug("pressing right")
-        heldLenL = 0
-        goLeft = false;
-    }
-})
-
-document.addEventListener("keyup", async function(e) {
-    if (LEFT_KEYS.includes(e.key)) {
-        printDebug("releasing left")
-        isKeyDownL = false
-    }
-    if (RIGHT_KEYS.includes(e.key)) {
-        printDebug("releasing right")
-    }
-})
+    start = false
+}
 
 function getPos() {
     return pos
@@ -73,20 +62,78 @@ function update_bias() {
     bias_update_period = Math.floor(60+Math.random()*60)*LOOP_PERIOD;
 }
 
+function placeDot(pos) {
+    ctx.fillStyle = "black"
+    ctx.fillRect(pos, 200, SQUARE_SIZE, SQUARE_SIZE)
+}
+
+function removeDot(pos) {
+    ctx.fillStyle = "white"
+    ctx.fillRect(pos, 200, SQUARE_SIZE, SQUARE_SIZE)
+}
+
+function playAudio() {
+    osc.start()
+    osc.stop(audioContext.currentTime + 5000)  // temporary time
+    osc.connect(gain).connect(audioContext.destination)
+}
+
+document.addEventListener("keydown", function(e) {
+    if (e.key == " ") start = true
+})
+
+document.addEventListener("keydown", async function(e) {
+    if (e.key == 'm') {
+       playAudio() 
+    }
+})
+
+document.addEventListener("keydown", async function(e) {
+    if (LEFT_KEYS.includes(e.key)) {
+        printDebug("pressing left")
+        heldLenR = 0
+        isKeyDownL = true
+        goLeft = true
+    }
+    if (RIGHT_KEYS.includes(e.key)) {
+        printDebug("pressing right")
+        heldLenL = 0
+        goLeft = false
+    }
+})
+
+document.addEventListener("keyup", async function(e) {
+    if (LEFT_KEYS.includes(e.key)) {
+        printDebug("releasing left")
+        isKeyDownL = false
+    }
+    if (RIGHT_KEYS.includes(e.key)) {
+        printDebug("releasing right")
+    }
+})
+
+
 async function main(pos) {
+
+    placeDot(pos)
+    await startScreen()
+
     while (true) {
 
         pos = getPos()
-
-        // places square on screen
-        ctx.fillStyle = "black"
-        ctx.fillRect(pos, 200, SQUARE_SIZE, SQUARE_SIZE)
+        placeDot(pos)
         oldPos = pos
+
+        // change to new frequency
+        osc.frequency.value = 300+(pos - CENTER)/3
 
         // end condition
         if (pos < BOUNDRY_LEFT || pos > BOUNDRY_RIGHT-SQUARE_SIZE) {
             printDebug("lost");
-            return;
+            await startScreen()
+            removeDot(pos)
+            setPos(CENTER)
+            continue
         }
 
         if (goLeft) {
@@ -113,10 +160,8 @@ async function main(pos) {
         setPos(pos)
 
         await new Promise(r => setTimeout(r, LOOP_PERIOD));
-        
-        // removes square from screen
-        ctx.fillStyle = "white"
-        ctx.fillRect(oldPos, 200, SQUARE_SIZE, SQUARE_SIZE)
+
+        removeDot(oldPos)
     }
 }
 
