@@ -49,11 +49,11 @@ document.addEventListener("keydown", async function(e) {
 })
 
 document.addEventListener("keyup", async function(e) {
-    if (e.key == 'a') {
+    if (LEFT_KEYS.includes(e.key)) {
         printDebug("releasing left")
         isKeyDownL = false
     }
-    if (e.key == 'd') {
+    if (RIGHT_KEYS.includes(e.key)) {
         printDebug("releasing right")
     }
 })
